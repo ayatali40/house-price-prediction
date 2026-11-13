@@ -1,0 +1,31 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python and pytest junk
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Raw competition data: download it from Kaggle, don't redistribute it
+data/raw/*.csv
+data/raw/*.zip
+
+# Processed data
+data/processed/*
+!data/processed/.gitkeep
+
+# Models the scripts generate
+models/*
+!models/.gitkeep
+
+# Scratch files and OS noise
+*.tmp
+.~*
+.DS_Store
+Thumbs.db
+
+sample_submission.csv

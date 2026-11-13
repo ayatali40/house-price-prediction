@@ -1,0 +1,77 @@
+{
+  "training_rows": 1458,
+  "train_split_rows": 1166,
+  "validation_split_rows": 292,
+  "feature_columns": 85,
+  "target_transform": "log1p",
+  "selection_metric": "validation RMSE (dollars)",
+  "best_model": "Lasso Regression",
+  "best_validation_metrics": {
+    "mae": 13880.592766153148,
+    "rmse": 19363.509987939757,
+    "r2": 0.9321209222098845,
+    "cv_rmse_log": 0.11362033493554577
+  },
+  "all_models": [
+    {
+      "model": "Lasso Regression",
+      "train_mae": 11605.581323129269,
+      "train_rmse": 17527.953755110993,
+      "train_r2": 0.9528301991675702,
+      "val_mae": 13880.592766153148,
+      "val_rmse": 19363.509987939757,
+      "val_r2": 0.9321209222098845,
+      "cv_rmse_log": 0.11362033493554577
+    },
+    {
+      "model": "Ridge Regression",
+      "train_mae": 11087.650864699455,
+      "train_rmse": 16773.672122060485,
+      "train_r2": 0.9568025705411595,
+      "val_mae": 14325.845594894785,
+      "val_rmse": 20031.741556180492,
+      "val_r2": 0.9273550912750042,
+      "cv_rmse_log": 0.1138646429472721
+    },
+    {
+      "model": "Gradient Boosting",
+      "train_mae": 6092.864325483282,
+      "train_rmse": 8353.102661566183,
+      "train_r2": 0.9892873419327081,
+      "val_mae": 14522.54872989393,
+      "val_rmse": 20241.374041927666,
+      "val_r2": 0.9258266752646163,
+      "cv_rmse_log": 0.12469232987950825
+    },
+    {
+      "model": "Linear Regression",
+      "train_mae": 10283.464251991982,
+      "train_rmse": 15462.230787783297,
+      "train_r2": 0.9632932522378574,
+      "val_mae": 15529.008186999416,
+      "val_rmse": 22207.136219982374,
+      "val_r2": 0.9107202678383783,
+      "cv_rmse_log": 0.1298049430013995
+    },
+    {
+      "model": "Random Forest",
+      "train_mae": 6158.503248633977,
+      "train_rmse": 10207.48401426315,
+      "train_r2": 0.9840029824246321,
+      "val_mae": 16432.516721277483,
+      "val_rmse": 23654.865455845218,
+      "val_r2": 0.8987001668570777,
+      "cv_rmse_log": 0.13665749462805032
+    },
+    {
+      "model": "Decision Tree",
+      "train_mae": 13269.028862027064,
+      "train_rmse": 19970.896343727723,
+      "train_r2": 0.9387654232883091,
+      "val_mae": 24495.223564376367,
+      "val_rmse": 40447.82532466979,
+      "val_r2": 0.7038183698542807,
+      "cv_rmse_log": 0.17625142296199642
+    }
+  ]
+}
