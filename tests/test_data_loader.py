@@ -24,7 +24,7 @@ def test_load_csv_missing_file_explains_where_to_put_data(tmp_path):
 
 
 def test_validate_training_data_accepts_valid_frame(house_frame):
-    validate_training_data(house_frame)  # should not raise
+    validate_training_data(house_frame)
 
 
 def test_validate_training_data_requires_target(house_frame):

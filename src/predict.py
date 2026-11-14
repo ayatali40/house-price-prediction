@@ -1,6 +1,4 @@
-"""Load the saved pipeline and predict prices for new houses.
-
-Run from the project root:
+"""Predict sale prices for new houses.
 
     python -m src.predict --input data/raw/test.csv --output reports/test_predictions.csv
 """
@@ -23,36 +21,40 @@ MODEL_PATH = PROJECT_ROOT / "models" / "best_model.joblib"
 
 
 def load_model(path: str | Path = MODEL_PATH):
-    """Load the fitted pipeline, with a nudge toward src.train if it's absent."""
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(
-            f"Model artifact not found: {path}\nRun 'python -m src.train' first."
+            f"Model not found: {path}\nRun 'python -m src.train' first."
         )
     return joblib.load(path)
 
 
-def predict(model, df: pd.DataFrame) -> pd.DataFrame:
-    """Return Id and predicted price for every row of ``df``.
-
-    Cleaning and feature engineering are repeated here, then the saved
-    pipeline takes care of imputation, encoding, scaling and prediction.
-    """
+def predict(model_artifact, df: pd.DataFrame) -> pd.DataFrame:
     if ID_COLUMN not in df.columns:
-        raise ValueError(f"Input data must contain an '{ID_COLUMN}' column.")
+        raise ValueError(f"Input must contain an '{ID_COLUMN}' column.")
 
-    features = engineer_features(clean_data(df))
-    predictions = np.expm1(model.predict(features))
+    # Support both plain pipeline (old) and dict artifact (new).
+    if isinstance(model_artifact, dict):
+        pipeline = model_artifact["pipeline"]
+        medians = model_artifact.get("lot_frontage_medians")
+    else:
+        pipeline = model_artifact
+        medians = None
+
+    features = engineer_features(
+        clean_data(df, lot_frontage_medians=medians)
+    )
+    predictions = np.expm1(pipeline.predict(features))
     return pd.DataFrame({"Id": df[ID_COLUMN], "PredictedSalePrice": predictions})
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Predict house sale prices.")
-    parser.add_argument("--input", default=str(TEST_PATH), help="CSV file with house features")
+    parser.add_argument("--input", default=str(TEST_PATH), help="CSV with house features")
     parser.add_argument(
         "--output",
         default=str(PROJECT_ROOT / "reports" / "test_predictions.csv"),
-        help="Where to write predictions",
+        help="Output path",
     )
     args = parser.parse_args()
 

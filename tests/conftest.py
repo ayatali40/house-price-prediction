@@ -1,7 +1,4 @@
-"""Small synthetic fixtures for the tests.
-
-They are only here to exercise the code, never to stand in for the real
-competition data or to produce reported results."""
+"""Synthetic fixtures for tests."""
 
 from __future__ import annotations
 
@@ -14,7 +11,6 @@ from src.data_cleaning import STRUCTURAL_CATEGORICAL_NA, STRUCTURAL_NUMERIC_NA
 
 @pytest.fixture
 def house_frame() -> pd.DataFrame:
-    """Eight tiny houses covering the fields the pipeline touches."""
     rows = []
     for i in range(8):
         row = {

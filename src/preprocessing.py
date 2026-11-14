@@ -1,8 +1,4 @@
-"""Scikit-learn preprocessing.
-
-Imputation, encoding and scaling all live inside the pipeline, so they are
-fitted on the training split and nowhere else.
-"""
+"""Preprocessing pipelines fitted on the training split only."""
 
 from __future__ import annotations
 
@@ -18,7 +14,6 @@ NON_FEATURE_COLUMNS = [ID_COLUMN, TARGET_COLUMN]
 
 
 def split_feature_types(df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    """Split the feature columns into numeric and categorical lists."""
     features = df.drop(columns=[c for c in NON_FEATURE_COLUMNS if c in df.columns])
     numeric = features.select_dtypes(include="number").columns.tolist()
     categorical = features.select_dtypes(include=["object", "category"]).columns.tolist()
@@ -26,16 +21,6 @@ def split_feature_types(df: pd.DataFrame) -> tuple[list[str], list[str]]:
 
 
 def make_pipeline(model, feature_frame: pd.DataFrame, scale_numeric: bool = True) -> Pipeline:
-    """Build the preprocessing + model pipeline for a training frame.
-
-    Numbers get median imputation, which shrugs off outliers. Categories get
-    mode imputation and one-hot encoding; unseen levels are ignored rather
-    than raising an error. Scaling is on for linear models and off for trees,
-    which don't care about scale.
-
-    The column lists come from ``feature_frame`` (the training split), so each
-    fitted pipeline remembers exactly what it was built for.
-    """
     numeric, categorical = split_feature_types(feature_frame)
 
     numeric_steps: list[tuple[str, object]] = [("imputer", SimpleImputer(strategy="median"))]

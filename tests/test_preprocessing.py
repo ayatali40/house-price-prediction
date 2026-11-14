@@ -6,13 +6,20 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-from src.data_cleaning import clean_data, remove_price_outliers
+from src.data_cleaning import (
+    clean_data,
+    compute_lot_frontage_medians,
+    fill_structural_missing,
+    remove_price_outliers,
+)
 from src.feature_engineering import engineer_features
 from src.preprocessing import make_pipeline
 
 
-def _features(frame: pd.DataFrame) -> pd.DataFrame:
-    return engineer_features(clean_data(frame)).drop(columns=["SalePrice"])
+def _features(frame: pd.DataFrame, medians=None) -> pd.DataFrame:
+    return engineer_features(
+        clean_data(frame, lot_frontage_medians=medians)
+    ).drop(columns=["SalePrice"])
 
 
 def test_structural_missing_values_become_meaningful_values(house_frame):
@@ -26,12 +33,21 @@ def test_structural_missing_values_become_meaningful_values(house_frame):
     assert cleaned["LotFrontage"].notna().all()
 
 
+def test_lot_frontage_uses_provided_medians(house_frame):
+    structural = fill_structural_missing(house_frame)
+    medians = compute_lot_frontage_medians(structural)
+
+    # Simulate a new row with missing frontage in a known neighborhood
+    new_row = house_frame.iloc[[0]].copy()
+    new_row["LotFrontage"] = np.nan
+    filled = clean_data(new_row, lot_frontage_medians=medians)
+    assert filled["LotFrontage"].notna().all()
+
+
 def test_engineered_features_have_expected_values(house_frame):
     featured = engineer_features(clean_data(house_frame))
     first = featured.iloc[0]
 
-    # Every structural numeric field is absent in the fixture, so the basement
-    # contributes 0.
     assert first["TotalSF"] == 0 + 900 + 300
     assert first["TotalBathrooms"] == 2
     assert first["HouseAge"] == 2010 - 1990

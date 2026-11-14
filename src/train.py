@@ -1,12 +1,6 @@
-"""Train, compare and save the regression models.
-
-Run from the project root:
+"""Train and save house price models.
 
     python -m src.train
-
-The flow is load, clean, add features, split, compare, select, refit and save.
-Every model learns log1p(SalePrice); metrics are converted back to dollars
-before they are reported.
 """
 
 from __future__ import annotations
@@ -23,8 +17,12 @@ from sklearn.linear_model import Lasso, LinearRegression, Ridge
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.tree import DecisionTreeRegressor
 
-from src.data_cleaning import clean_data
-from src.data_loader import TARGET_COLUMN, load_csv, load_raw_data, validate_training_data
+from src.data_cleaning import (
+    clean_data,
+    compute_lot_frontage_medians,
+    fill_structural_missing,
+)
+from src.data_loader import TARGET_COLUMN, load_raw_data, validate_training_data
 from src.evaluation import (
     predict_prices,
     plot_actual_vs_predicted,
@@ -46,7 +44,6 @@ TEST_SIZE = 0.2
 
 
 def get_models() -> dict[str, tuple[object, bool]]:
-    """Return ``{name: (estimator, needs_scaling)}``. Boring defaults on purpose."""
     return {
         "Linear Regression": (LinearRegression(), True),
         "Ridge Regression": (Ridge(alpha=10.0), True),
@@ -74,19 +71,32 @@ def get_models() -> dict[str, tuple[object, bool]]:
 def prepare_training_data(
     train_df: pd.DataFrame,
     remove_outliers: bool = True,
-) -> tuple[pd.DataFrame, pd.Series]:
-    """Clean the training frame, add features, and split off SalePrice."""
+) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """Clean, engineer features, return X, y, and lot-frontage medians."""
     validate_training_data(train_df)
-    cleaned = clean_data(train_df, remove_outliers=remove_outliers)
+
+    # Structural fill first, then learn neighborhood medians on training rows only.
+    structural = fill_structural_missing(train_df)
+    lot_frontage_medians = compute_lot_frontage_medians(structural)
+
+    cleaned = clean_data(
+        train_df,
+        remove_outliers=remove_outliers,
+        lot_frontage_medians=lot_frontage_medians,
+    )
     featured = engineer_features(cleaned)
     X = featured.drop(columns=[TARGET_COLUMN])
     y = featured[TARGET_COLUMN]
-    return X, y
+    return X, y, lot_frontage_medians
 
 
-def prepare_test_features(test_df: pd.DataFrame) -> pd.DataFrame:
-    """Apply the same cleaning and feature engineering to the test set."""
-    return engineer_features(clean_data(test_df))
+def prepare_test_features(
+    test_df: pd.DataFrame,
+    lot_frontage_medians: pd.Series,
+) -> pd.DataFrame:
+    return engineer_features(
+        clean_data(test_df, lot_frontage_medians=lot_frontage_medians)
+    )
 
 
 def split_data(
@@ -95,7 +105,6 @@ def split_data(
     test_size: float = TEST_SIZE,
     random_state: int = RANDOM_STATE,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    """One hold-out split, shared by every model."""
     return train_test_split(X, y, test_size=test_size, random_state=random_state)
 
 
@@ -106,15 +115,9 @@ def compare_models(
     y_val: pd.Series,
     cv: int = 5,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
-    """Fit each baseline on the same split and collect both sets of metrics.
-
-    We keep training and validation errors side by side so overfitting is
-    visible. The 5-fold CV score uses the training split only, so validation
-    information can't leak into it.
-    """
     log_y_train = np.log1p(y_train)
-    rows: list[dict[str, object]] = []
-    fitted: dict[str, object] = {}
+    rows = []
+    fitted = {}
 
     for name, (estimator, scale_numeric) in get_models().items():
         pipeline = make_pipeline(estimator, X_train, scale_numeric=scale_numeric)
@@ -156,15 +159,21 @@ def train_final_model(
     y: pd.Series,
     model_name: str,
     X_train: pd.DataFrame,
-) -> object:
-    """Refit the chosen model on all labelled rows and save it with joblib."""
+    lot_frontage_medians: pd.Series,
+) -> dict:
     estimator, scale_numeric = get_models()[model_name]
     pipeline = make_pipeline(clone(estimator), X_train, scale_numeric=scale_numeric)
     pipeline.fit(X, np.log1p(y))
 
+    artifact = {
+        "pipeline": pipeline,
+        "lot_frontage_medians": lot_frontage_medians,
+        "model_name": model_name,
+    }
+
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, MODEL_PATH)
-    return pipeline
+    joblib.dump(artifact, MODEL_PATH)
+    return artifact
 
 
 def _select_best(results: pd.DataFrame) -> str:
@@ -173,7 +182,7 @@ def _select_best(results: pd.DataFrame) -> str:
 
 def main() -> None:
     train_df, test_df = load_raw_data()
-    X, y = prepare_training_data(train_df, remove_outliers=True)
+    X, y, lot_frontage_medians = prepare_training_data(train_df, remove_outliers=True)
     X_train, X_val, y_train, y_val = split_data(X, y)
 
     results, fitted = compare_models(X_train, y_train, X_val, y_val)
@@ -210,9 +219,11 @@ def main() -> None:
         title=f"Residuals vs Predicted — {best_name} (validation)",
     )
 
-    final_pipeline = train_final_model(X, y, best_name, X_train)
+    final_artifact = train_final_model(X, y, best_name, X_train, lot_frontage_medians)
+    final_pipeline = final_artifact["pipeline"]
 
-    test_predictions = predict_prices(final_pipeline, prepare_test_features(test_df))
+    test_features = prepare_test_features(test_df, lot_frontage_medians)
+    test_predictions = predict_prices(final_pipeline, test_features)
     submission = pd.DataFrame({"Id": test_df["Id"], "PredictedSalePrice": test_predictions})
     submission.to_csv(REPORTS_DIR / "test_predictions.csv", index=False)
 

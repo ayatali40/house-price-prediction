@@ -7,7 +7,7 @@ from pathlib import Path
 
 import matplotlib
 
-if "ipykernel" not in sys.modules:  # outside Jupyter, don't require a display
+if "ipykernel" not in sys.modules:
     matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
@@ -21,7 +21,6 @@ FIGURE_DPI = 130
 
 
 def regression_metrics(y_true, y_pred) -> dict[str, float]:
-    """Return MAE, MSE, RMSE and R^2, all on the scale of the inputs."""
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
     mse = mean_squared_error(y_true, y_pred)
@@ -34,7 +33,6 @@ def regression_metrics(y_true, y_pred) -> dict[str, float]:
 
 
 def predict_prices(model, features: pd.DataFrame) -> np.ndarray:
-    """Predict in log space, then convert back to dollars."""
     return np.expm1(model.predict(features))
 
 
@@ -44,7 +42,6 @@ def plot_actual_vs_predicted(
     path: str | Path = IMAGES_DIR / "eval_actual_vs_predicted.png",
     title: str = "Actual vs Predicted Sale Price",
 ) -> Path:
-    """Actual prices against predictions, with a 45-degree reference line."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     y_true = np.asarray(y_true, dtype=float)
@@ -72,7 +69,6 @@ def plot_residual_distribution(
     path: str | Path = IMAGES_DIR / "eval_residual_distribution.png",
     title: str = "Distribution of Residuals",
 ) -> Path:
-    """Histogram of residuals, meaning actual minus predicted."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     residuals = np.asarray(y_true, dtype=float) - np.asarray(y_pred, dtype=float)
@@ -96,7 +92,6 @@ def plot_residuals_vs_predicted(
     path: str | Path = IMAGES_DIR / "eval_residuals_vs_predicted.png",
     title: str = "Residuals vs Predicted Price",
 ) -> Path:
-    """Residuals against predictions, to check whether the error spread changes."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     y_pred = np.asarray(y_pred, dtype=float)
@@ -119,7 +114,6 @@ def plot_model_comparison(
     path: str | Path = IMAGES_DIR / "model_comparison.png",
     title: str = "Training vs Validation RMSE by Model",
 ) -> Path:
-    """Side-by-side bars for training and validation RMSE."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 

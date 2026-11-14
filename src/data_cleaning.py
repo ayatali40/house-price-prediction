@@ -1,20 +1,9 @@
-"""Cleaning rules for the House Prices data.
-
-The dataset uses NaN for two very different things:
-
-1. The house really doesn't have the feature (no garage, no basement, no pool).
-2. Someone didn't record the value (mostly LotFrontage).
-
-Those need different treatment, so the rules are split below. The lists are
-module constants so the training and prediction paths use exactly the same
-columns.
-"""
+"""Cleaning rules for the House Prices data."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-# A NaN here means the house doesn't have the thing, so make that explicit.
 STRUCTURAL_CATEGORICAL_NA = [
     "Alley",
     "BsmtQual",
@@ -33,7 +22,6 @@ STRUCTURAL_CATEGORICAL_NA = [
     "MasVnrType",
 ]
 
-# Same idea for amounts: no garage means zero area and zero cars.
 STRUCTURAL_NUMERIC_NA = [
     "MasVnrArea",
     "BsmtFinSF1",
@@ -46,13 +34,11 @@ STRUCTURAL_NUMERIC_NA = [
     "GarageArea",
 ]
 
-# No garage year usually means the garage went up with the house.
 GARAGE_YEAR_COLUMN = "GarageYrBlt"
 BUILD_YEAR_COLUMN = "YearBuilt"
 
 
 def fill_structural_missing(df: pd.DataFrame) -> pd.DataFrame:
-    """Turn "feature absent" NaNs into explicit "None" or 0 values."""
     df = df.copy()
     for column in STRUCTURAL_CATEGORICAL_NA:
         if column in df.columns:
@@ -65,18 +51,39 @@ def fill_structural_missing(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def impute_lot_frontage(df: pd.DataFrame) -> pd.DataFrame:
-    """Fill LotFrontage with the median of the same neighborhood.
+def compute_lot_frontage_medians(df: pd.DataFrame) -> pd.Series:
+    """Neighborhood medians for LotFrontage, learned from training data only."""
+    if "LotFrontage" not in df.columns or "Neighborhood" not in df.columns:
+        return pd.Series(dtype=float)
+    return df.groupby("Neighborhood")["LotFrontage"].median()
 
-    Frontage follows the street layout, so a local median beats one global
-    number.
+
+def impute_lot_frontage(
+    df: pd.DataFrame,
+    neighborhood_medians: pd.Series | None = None,
+) -> pd.DataFrame:
+    """Fill LotFrontage using neighborhood medians.
+
+    Pass medians learned on the training set when scoring new data.
+    If medians is None, they are computed from ``df`` (training path only).
     """
     df = df.copy()
     if "LotFrontage" not in df.columns or "Neighborhood" not in df.columns:
         return df
-    neighborhood_median = df.groupby("Neighborhood")["LotFrontage"].transform("median")
-    df["LotFrontage"] = df["LotFrontage"].fillna(neighborhood_median)
-    df["LotFrontage"] = df["LotFrontage"].fillna(df["LotFrontage"].median())
+
+    if neighborhood_medians is None:
+        neighborhood_medians = compute_lot_frontage_medians(df)
+
+    mapped = df["Neighborhood"].map(neighborhood_medians)
+    df["LotFrontage"] = df["LotFrontage"].fillna(mapped)
+    global_median = (
+        float(neighborhood_medians.median())
+        if len(neighborhood_medians)
+        else float(df["LotFrontage"].median())
+    )
+    if pd.isna(global_median):
+        global_median = 0.0
+    df["LotFrontage"] = df["LotFrontage"].fillna(global_median)
     return df
 
 
@@ -85,31 +92,21 @@ def remove_price_outliers(
     area_threshold: float = 4000,
     price_threshold: float = 300_000,
 ) -> pd.DataFrame:
-    """Drop the famous Ames oddities: huge houses that sold cheap.
-
-    Two training rows have more than 4,000 sq ft of living area but went for
-    under $300k, way below what houses that size normally fetch. Keeping them
-    would drag the regression line toward a pattern that doesn't generalise.
-    The filter needs SalePrice, so it only works on labelled data.
-    """
+    """Drop large houses that sold unusually cheap (training only)."""
     if {"GrLivArea", "SalePrice"}.issubset(df.columns):
         mask = (df["GrLivArea"] > area_threshold) & (df["SalePrice"] < price_threshold)
         df = df.loc[~mask].copy()
     return df
 
 
-def clean_data(df: pd.DataFrame, remove_outliers: bool = False) -> pd.DataFrame:
-    """Run every cleaning step and return a new DataFrame.
-
-    Parameters
-    ----------
-    df:
-        Raw data (training or competition test).
-    remove_outliers:
-        Only makes sense for labelled training data.
-    """
+def clean_data(
+    df: pd.DataFrame,
+    remove_outliers: bool = False,
+    lot_frontage_medians: pd.Series | None = None,
+) -> pd.DataFrame:
+    """Run cleaning steps. Pass train medians when preparing test/new data."""
     df = fill_structural_missing(df)
-    df = impute_lot_frontage(df)
+    df = impute_lot_frontage(df, neighborhood_medians=lot_frontage_medians)
     if remove_outliers:
         df = remove_price_outliers(df)
     return df

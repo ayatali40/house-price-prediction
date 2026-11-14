@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from sklearn.linear_model import LinearRegression
 
-from src.data_cleaning import clean_data
+from src.data_cleaning import clean_data, compute_lot_frontage_medians, fill_structural_missing
 from src.evaluation import (
     plot_actual_vs_predicted,
     plot_model_comparison,
@@ -36,12 +36,15 @@ def test_metrics_on_a_small_known_example():
 
 
 def test_prediction_pipeline_returns_prices_for_each_house(house_frame):
-    featured = engineer_features(clean_data(house_frame))
+    structural = fill_structural_missing(house_frame)
+    medians = compute_lot_frontage_medians(structural)
+    featured = engineer_features(clean_data(house_frame, lot_frontage_medians=medians))
     X = featured.drop(columns=["SalePrice"])
     pipeline = make_pipeline(LinearRegression(), X)
     pipeline.fit(X, np.log1p(featured["SalePrice"]))
 
-    predictions = predict(pipeline, house_frame)
+    artifact = {"pipeline": pipeline, "lot_frontage_medians": medians}
+    predictions = predict(artifact, house_frame)
 
     assert list(predictions.columns) == ["Id", "PredictedSalePrice"]
     assert len(predictions) == len(house_frame)
@@ -51,7 +54,7 @@ def test_prediction_pipeline_returns_prices_for_each_house(house_frame):
 
 def test_prediction_requires_id_column(house_frame):
     with pytest.raises(ValueError, match="'Id'"):
-        predict(model=None, df=house_frame.drop(columns=["Id"]))
+        predict(model_artifact=None, df=house_frame.drop(columns=["Id"]))
 
 
 def test_evaluation_plots_are_saved(tmp_path):
